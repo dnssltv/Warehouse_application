@@ -13,6 +13,8 @@ from app.models.user import User
 from app.models.work_type import WorkType
 from app.schemas.request import (
     RequestActionByUser,
+    RequestAdminEdit,
+    RequestAttachmentDelete,
     RequestAssign,
     RequestCreate,
     RequestManagerComment,
@@ -22,6 +24,14 @@ from app.schemas.request import (
 from app.services.request_service import RequestService
 
 router = APIRouter(prefix="/requests", tags=["requests"])
+
+
+def _remove_local_upload(path: str) -> None:
+    normalized = os.path.normpath(path)
+    if not normalized.startswith("uploads" + os.sep) and normalized != "uploads":
+        return
+    if os.path.exists(normalized):
+        os.remove(normalized)
 
 
 @router.get("", response_model=list[RequestRead])
@@ -103,13 +113,13 @@ def upload_attachment(
     request_id: UUID,
     file: UploadFile = File(...),
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_roles("requester")),
+    current_user: User = Depends(require_roles("requester", "admin")),
 ):
     request = db.query(Request).filter(Request.id == request_id).first()
     if not request:
         raise HTTPException(status_code=404, detail="Request not found")
 
-    if request.requester_id != current_user.id:
+    if current_user.role != "admin" and request.requester_id != current_user.id:
         raise HTTPException(status_code=403, detail="You can upload files only to your own request")
 
     upload_dir = "uploads"
@@ -125,6 +135,67 @@ def upload_attachment(
     attachments = request.attachments or []
     attachments.append(file_path)
     request.attachments = attachments
+
+    db.commit()
+    db.refresh(request)
+    return request
+
+
+@router.delete("/{request_id}/attachments", response_model=RequestRead)
+def delete_attachment(
+    request_id: UUID,
+    payload: RequestAttachmentDelete,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_roles("requester", "admin")),
+):
+    request = db.query(Request).filter(Request.id == request_id).first()
+    if not request:
+        raise HTTPException(status_code=404, detail="Request not found")
+
+    if current_user.role != "admin" and request.requester_id != current_user.id:
+        raise HTTPException(status_code=403, detail="You can delete files only from your own request")
+
+    attachments = request.attachments or []
+    if payload.file_path not in attachments:
+        raise HTTPException(status_code=404, detail="Attachment not found in request")
+
+    attachments.remove(payload.file_path)
+    request.attachments = attachments
+
+    _remove_local_upload(payload.file_path)
+
+    db.commit()
+    db.refresh(request)
+    return request
+
+
+@router.patch("/{request_id}/admin-edit", response_model=RequestRead)
+def admin_edit_request(
+    request_id: UUID,
+    payload: RequestAdminEdit,
+    db: Session = Depends(get_db),
+    _: User = Depends(require_roles("admin")),
+):
+    request = db.query(Request).filter(Request.id == request_id).first()
+    if not request:
+        raise HTTPException(status_code=404, detail="Request not found")
+
+    updatable_fields = (
+        "item_qty",
+        "movement_number",
+        "comment",
+        "priority",
+        "status",
+        "deadline_seconds",
+        "deadline_at",
+        "manager_comment",
+        "quality_rating",
+        "quality_comment",
+        "quality_rated_at",
+    )
+    for field in updatable_fields:
+        if field in payload.model_fields_set:
+            setattr(request, field, getattr(payload, field))
 
     db.commit()
     db.refresh(request)
