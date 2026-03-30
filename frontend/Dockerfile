@@ -6,7 +6,8 @@ COPY package*.json ./
 RUN npm install
 
 COPY . .
+RUN npm run build
+RUN npm install -g serve
 
-EXPOSE 4173
-
-CMD ["sh", "-c", "npm run build && npm run preview -- --host 0.0.0.0 --port ${PORT:-4173}"]
+EXPOSE 8080
+CMD ["sh", "-c", "serve -s dist -l ${PORT:-8080}"]
