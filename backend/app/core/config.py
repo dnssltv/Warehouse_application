@@ -12,9 +12,15 @@ class Settings(BaseSettings):
 
     BACKEND_HOST: str = "0.0.0.0"
     BACKEND_PORT: int = 8000
+    CORS_ORIGINS: list[str] = ["http://localhost:5173"]
 
     SECRET_KEY: str
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 1440
+    ADMIN_EMAIL: str
+    ADMIN_PASSWORD: str
+    ADMIN_FIRST_NAME: str = "Admin"
+    ADMIN_LAST_NAME: str = "User"
+    SYNC_ADMIN_ON_STARTUP: bool = False
 
     @property
     def database_url(self) -> str:

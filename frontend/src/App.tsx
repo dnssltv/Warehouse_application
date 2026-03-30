@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useState } from "react";
 
-const API_BASE = "http://localhost:8000/api";
+const API_BASE = import.meta.env.VITE_API_BASE_URL || "http://localhost:8000/api";
 const BRAND_PRIMARY = "#2C26C2";
 const BRAND_SUCCESS = "#00C853";
 const LOGO_FILENAME = "warehouse-logo.png";
@@ -364,8 +364,8 @@ export default function App() {
   });
 
   const [loginForm, setLoginForm] = useState<LoginForm>({
-    email: "administrator@example.com",
-    password: "Ui4ufiyo",
+    email: "",
+    password: "",
   });
 
   const [adminCreateUserForm, setAdminCreateUserForm] = useState<AdminCreateUserForm>({
