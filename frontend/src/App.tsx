@@ -364,8 +364,8 @@ export default function App() {
   });
 
   const [loginForm, setLoginForm] = useState<LoginForm>({
-    email: "administrator@example.com",
-    password: "Ui4ufiyo",
+    email: "",
+    password: "",
   });
 
   const [adminCreateUserForm, setAdminCreateUserForm] = useState<AdminCreateUserForm>({
