@@ -1,0 +1,5 @@
+.env
+frontend/dist/
+frontend/node_modules/
+backend/app/**/__pycache__/
+backend/uploads/
