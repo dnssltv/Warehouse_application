@@ -31,6 +31,24 @@ class RequestRate(BaseModel):
     quality_comment: str | None = None
 
 
+class RequestAdminEdit(BaseModel):
+    item_qty: int | None = Field(default=None, gt=0)
+    movement_number: str | None = None
+    comment: str | None = None
+    priority: str | None = None
+    status: str | None = None
+    deadline_seconds: int | None = Field(default=None, gt=0)
+    deadline_at: datetime | None = None
+    manager_comment: str | None = None
+    quality_rating: int | None = Field(default=None, ge=1, le=5)
+    quality_comment: str | None = None
+    quality_rated_at: datetime | None = None
+
+
+class RequestAttachmentDelete(BaseModel):
+    file_path: str
+
+
 class RequestRead(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 

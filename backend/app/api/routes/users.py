@@ -78,6 +78,9 @@ def login(payload: LoginRequest, db: Session = Depends(get_db)):
     if not verify_password(payload.password, user.password_hash):
         raise HTTPException(status_code=401, detail="Invalid email or password")
 
+    if not user.is_active:
+        raise HTTPException(status_code=403, detail="Inactive user")
+
     token = create_access_token(str(user.id))
     return TokenResponse(access_token=token)
 

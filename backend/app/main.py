@@ -8,6 +8,7 @@ from sqlalchemy import text
 from sqlalchemy.orm import Session
 
 from app.api.router import api_router
+from app.core.config import settings
 from app.core.security import get_password_hash
 from app.db.base import Base
 from app.db.session import SessionLocal, engine
@@ -19,7 +20,7 @@ app = FastAPI(title="Warehouse App API")
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=settings.CORS_ORIGINS,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -34,22 +35,34 @@ app.mount("/uploads", StaticFiles(directory="uploads"), name="uploads")
 def seed_admin():
     db: Session = SessionLocal()
     try:
-        admin_email = "administrator@example.com"
+        admin_email = settings.ADMIN_EMAIL
         existing_admin = db.query(User).filter(User.email == admin_email).first()
 
-        if not existing_admin:
-            user = User(
-                first_name="System",
-                last_name="Administrator",
-                full_name="Administrator System",
-                email=admin_email,
-                password_hash=get_password_hash("Ui4ufiyo"),
-                role="admin",
-                is_active=True,
-            )
-            db.add(user)
+        if existing_admin and settings.SYNC_ADMIN_ON_STARTUP:
+            existing_admin.password_hash = get_password_hash(settings.ADMIN_PASSWORD)
+            existing_admin.first_name = settings.ADMIN_FIRST_NAME
+            existing_admin.last_name = settings.ADMIN_LAST_NAME
+            existing_admin.full_name = f"{settings.ADMIN_LAST_NAME} {settings.ADMIN_FIRST_NAME}"
+            existing_admin.role = "admin"
+            existing_admin.is_active = True
             db.commit()
-            print("Default admin created: administrator@example.com / Ui4ufiyo")
+            return
+
+        if existing_admin:
+            return
+
+        user = User(
+            first_name=settings.ADMIN_FIRST_NAME,
+            last_name=settings.ADMIN_LAST_NAME,
+            full_name=f"{settings.ADMIN_LAST_NAME} {settings.ADMIN_FIRST_NAME}",
+            email=admin_email,
+            password_hash=get_password_hash(settings.ADMIN_PASSWORD),
+            role="admin",
+            is_active=True,
+        )
+        db.add(user)
+        db.commit()
+        print(f"Admin account created: {admin_email}")
     finally:
         db.close()
 
