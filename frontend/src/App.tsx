@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useState } from "react";
 
 const API_BASE = import.meta.env.VITE_API_BASE_URL || "http://localhost:8000/api";
+const API_ORIGIN = API_BASE.replace(/\/api\/?$/, "");
 const BRAND_PRIMARY = "#2C26C2";
 const BRAND_SUCCESS = "#00C853";
 const LOGO_FILENAME = "warehouse-logo.png";
@@ -126,6 +127,7 @@ function getStatusLabel(status: string) {
     new: "Новая",
     assigned: "Назначена",
     in_progress: "В работе",
+    paused: "На паузе",
     assembled: "Собрана",
     approved: "Подтверждена",
     returned_to_work: "Возврат в работу",
@@ -350,6 +352,7 @@ export default function App() {
   const [selectedFiles, setSelectedFiles] = useState<FileList | null>(null);
   const [selectedAssignees, setSelectedAssignees] = useState<Record<string, string[]>>({});
   const [managerComments, setManagerComments] = useState<Record<string, string>>({});
+  const [pauseComments, setPauseComments] = useState<Record<string, string>>({});
   const [editingUserId, setEditingUserId] = useState<string | null>(null);
   const [editUserForm, setEditUserForm] = useState<EditUserForm>({
     first_name: "",
@@ -650,6 +653,37 @@ export default function App() {
       await bootstrap(token);
     } catch (e) {
       setError(e instanceof Error ? e.message : "Ошибка завершения");
+    }
+  }
+
+  async function pauseRequest(requestId: string) {
+    if (!token || !me) return;
+    try {
+      setError("");
+      await api<RequestItem>(`/requests/${requestId}/pause`, token, {
+        method: "POST",
+        body: JSON.stringify({
+          user_id: me.id,
+          pause_comment: pauseComments[requestId] || null,
+        }),
+      });
+      await bootstrap(token);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Ошибка постановки на паузу");
+    }
+  }
+
+  async function resumeRequest(requestId: string) {
+    if (!token || !me) return;
+    try {
+      setError("");
+      await api<RequestItem>(`/requests/${requestId}/resume`, token, {
+        method: "POST",
+        body: JSON.stringify({ user_id: me.id }),
+      });
+      await bootstrap(token);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Ошибка продолжения работы");
     }
   }
 
@@ -977,8 +1011,8 @@ export default function App() {
                     {request.attachments && request.attachments.length > 0 ? (
                       request.attachments.map((filePath, idx) => {
                         const publicPath = filePath.startsWith("uploads/")
-                          ? `http://localhost:8000/${filePath}`
-                          : `http://localhost:8000/uploads/${filePath}`;
+                          ? `${API_ORIGIN}/${filePath}`
+                          : `${API_ORIGIN}/uploads/${filePath}`;
                         return (
                           <div key={idx}>
                             <a href={publicPath} target="_blank" rel="noreferrer">
@@ -1035,7 +1069,26 @@ export default function App() {
                   {me.role === "warehouse_operator" && request.status === "in_progress" && (
                     request.assignee_ids?.includes(me.id) || request.assignee_id === me.id
                   ) && (
-                    <Button onClick={() => finishRequest(request.id)}>Завершить сборку</Button>
+                    <div style={{ display: "flex", gap: 8, flexWrap: "wrap", width: "100%" }}>
+                      <Textarea
+                        placeholder="Комментарий при паузе (необязательно)"
+                        value={pauseComments[request.id] || ""}
+                        onChange={(e) =>
+                          setPauseComments((old) => ({
+                            ...old,
+                            [request.id]: e.target.value,
+                          }))
+                        }
+                      />
+                      <Button onClick={() => finishRequest(request.id)}>Завершить сборку</Button>
+                      <SecondaryButton onClick={() => pauseRequest(request.id)}>Поставить на паузу</SecondaryButton>
+                    </div>
+                  )}
+
+                  {me.role === "warehouse_operator" && request.status === "paused" && (
+                    request.assignee_ids?.includes(me.id) || request.assignee_id === me.id
+                  ) && (
+                    <SuccessButton onClick={() => resumeRequest(request.id)}>Продолжить работу</SuccessButton>
                   )}
 
                   {me.role === "warehouse_manager" && request.status === "assembled" && request.manager_id === me.id && (

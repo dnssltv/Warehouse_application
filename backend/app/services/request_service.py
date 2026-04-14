@@ -16,9 +16,17 @@ class RequestService:
         current_month = datetime.utcnow().strftime("%Y%m")
         prefix = f"REQ-{current_month}-"
 
-        stmt = select(func.count(Request.id)).where(Request.request_number.like(f"{prefix}%"))
-        current_count = db.execute(stmt).scalar_one()
-        next_number = current_count + 1
+        stmt = select(func.max(Request.request_number)).where(Request.request_number.like(f"{prefix}%"))
+        max_request_number = db.execute(stmt).scalar_one()
+        next_number = 1
+
+        if max_request_number:
+            try:
+                next_number = int(max_request_number.rsplit("-", 1)[-1]) + 1
+            except ValueError:
+                # Fallback keeps service resilient to malformed legacy values.
+                count_stmt = select(func.count(Request.id)).where(Request.request_number.like(f"{prefix}%"))
+                next_number = db.execute(count_stmt).scalar_one() + 1
 
         return f"{prefix}{next_number:04d}"
 

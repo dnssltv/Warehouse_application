@@ -5,6 +5,7 @@ from datetime import datetime
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, File, HTTPException, UploadFile
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from app.dependencies import get_current_user, get_db, require_roles
@@ -16,6 +17,7 @@ from app.schemas.request import (
     RequestAdminEdit,
     RequestAttachmentDelete,
     RequestAssign,
+    RequestPause,
     RequestCreate,
     RequestManagerComment,
     RequestRate,
@@ -86,26 +88,32 @@ def create_request(
 
     deadline_seconds, deadline_at = RequestService.calculate_deadline(payload.item_qty)
 
-    request = Request(
-        request_number=RequestService.generate_request_number(db),
-        requester_id=current_user.id,
-        requester_name=current_user.full_name,
-        requester_department="—",
-        work_type_id=work_type.id,
-        item_qty=payload.item_qty,
-        movement_number=payload.movement_number,
-        comment=payload.comment,
-        attachments=[],
-        priority=payload.priority,
-        status="new",
-        deadline_seconds=deadline_seconds,
-        deadline_at=deadline_at,
-    )
+    request = None
+    for _ in range(3):
+        request = Request(
+            request_number=RequestService.generate_request_number(db),
+            requester_id=current_user.id,
+            requester_name=current_user.full_name,
+            requester_department="—",
+            work_type_id=work_type.id,
+            item_qty=payload.item_qty,
+            movement_number=payload.movement_number,
+            comment=payload.comment,
+            attachments=[],
+            priority=payload.priority,
+            status="new",
+            deadline_seconds=deadline_seconds,
+            deadline_at=deadline_at,
+        )
+        db.add(request)
+        try:
+            db.commit()
+            db.refresh(request)
+            return request
+        except IntegrityError:
+            db.rollback()
 
-    db.add(request)
-    db.commit()
-    db.refresh(request)
-    return request
+    raise HTTPException(status_code=409, detail="Failed to generate unique request number. Please retry.")
 
 
 @router.post("/{request_id}/attachments", response_model=RequestRead)
@@ -302,6 +310,64 @@ def finish_request(
     request.finished_at = datetime.utcnow()
     request.duration_seconds = RequestService.calculate_duration_seconds(request.started_at, request.finished_at)
     request.status = "assembled"
+
+    db.commit()
+    db.refresh(request)
+    return request
+
+
+@router.post("/{request_id}/pause", response_model=RequestRead)
+def pause_request(
+    request_id: UUID,
+    payload: RequestPause,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_roles("warehouse_operator")),
+):
+    if payload.user_id != current_user.id:
+        raise HTTPException(status_code=403, detail="You can pause only as yourself")
+
+    request = db.query(Request).filter(Request.id == request_id).first()
+    if not request:
+        raise HTTPException(status_code=404, detail="Request not found")
+
+    assigned_ids = request.assignee_ids or ([] if not request.assignee_id else [str(request.assignee_id)])
+    if str(payload.user_id) not in assigned_ids:
+        raise HTTPException(status_code=400, detail="Only assigned warehouse operator can pause this request")
+
+    if request.status != "in_progress":
+        raise HTTPException(status_code=400, detail="Only request in progress can be paused")
+
+    request.status = "paused"
+    if payload.pause_comment:
+        request.manager_comment = f"Пауза: {payload.pause_comment}"
+
+    db.commit()
+    db.refresh(request)
+    return request
+
+
+@router.post("/{request_id}/resume", response_model=RequestRead)
+def resume_request(
+    request_id: UUID,
+    payload: RequestActionByUser,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_roles("warehouse_operator")),
+):
+    if payload.user_id != current_user.id:
+        raise HTTPException(status_code=403, detail="You can resume only as yourself")
+
+    request = db.query(Request).filter(Request.id == request_id).first()
+    if not request:
+        raise HTTPException(status_code=404, detail="Request not found")
+
+    assigned_ids = request.assignee_ids or ([] if not request.assignee_id else [str(request.assignee_id)])
+    if str(payload.user_id) not in assigned_ids:
+        raise HTTPException(status_code=400, detail="Only assigned warehouse operator can resume this request")
+
+    if request.status != "paused":
+        raise HTTPException(status_code=400, detail="Only paused request can be resumed")
+
+    request.status = "in_progress"
 
     db.commit()
     db.refresh(request)

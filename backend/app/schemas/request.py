@@ -25,6 +25,11 @@ class RequestActionByUser(BaseModel):
     user_id: UUID
 
 
+class RequestPause(BaseModel):
+    user_id: UUID
+    pause_comment: str | None = None
+
+
 class RequestRate(BaseModel):
     requester_id: UUID
     quality_rating: int = Field(ge=1, le=5)
