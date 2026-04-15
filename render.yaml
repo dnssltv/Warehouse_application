@@ -31,10 +31,10 @@ services:
         value: '["https://warehouse-frontend.onrender.com"]'
       - key: CORS_ALLOW_LAN
         value: "false"
-    disks:
-      - name: warehouse-uploads
-        mountPath: /opt/render/project/src/backend/uploads
-        sizeGB: 2
+    disk:
+      name: warehouse-uploads
+      mountPath: /opt/render/project/src/backend/uploads
+      sizeGB: 2
 
   - type: web
     env: static
