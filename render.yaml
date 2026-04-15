@@ -36,7 +36,8 @@ services:
         mountPath: /opt/render/project/src/backend/uploads
         sizeGB: 2
 
-  - type: static_site
+  - type: web
+    env: static
     name: warehouse-frontend
     rootDir: frontend
     buildCommand: npm ci && npm run build
