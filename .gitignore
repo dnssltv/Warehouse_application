@@ -2,4 +2,9 @@
 frontend/dist/
 frontend/node_modules/
 backend/app/**/__pycache__/
+**/__pycache__/
+*.pyc
+.pytest_cache/
+backend/.pytest_cache/
 backend/uploads/
+backups/
