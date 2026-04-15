@@ -1,0 +1,27 @@
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html {
+  -webkit-text-size-adjust: 100%;
+}
+
+body {
+  margin: 0;
+  overflow-x: hidden;
+  font-family: Arial, Helvetica, sans-serif;
+}
+
+#root {
+  min-height: 100vh;
+}
+
+/* Удобные зоны нажатия на тач-устройствах */
+@media (max-width: 768px) {
+  button,
+  [type="submit"] {
+    min-height: 44px;
+  }
+}

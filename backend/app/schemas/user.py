@@ -7,6 +7,18 @@ from pydantic import BaseModel, ConfigDict, EmailStr, field_validator
 
 LATIN_NAME_PATTERN = re.compile(r"^[A-Za-z]+$")
 
+ALL_ROLES = {
+    "pending",
+    "admin",
+    "general_director",
+    "commercial_director",
+    "requester",
+    "warehouse_manager",
+    "warehouse_operator",
+    "grading_manager",
+    "warehouse_operator_agc",
+}
+
 
 class UserRegister(BaseModel):
     first_name: str
@@ -18,7 +30,7 @@ class UserRegister(BaseModel):
     @classmethod
     def validate_latin_only(cls, value: str) -> str:
         if not LATIN_NAME_PATTERN.fullmatch(value):
-            raise ValueError("Only latin letters are allowed")
+            raise ValueError("Допустимы только латинские буквы")
         return value
 
 
@@ -33,15 +45,14 @@ class AdminCreateUser(BaseModel):
     @classmethod
     def validate_latin_only(cls, value: str) -> str:
         if not LATIN_NAME_PATTERN.fullmatch(value):
-            raise ValueError("Only latin letters are allowed")
+            raise ValueError("Допустимы только латинские буквы")
         return value
 
     @field_validator("role")
     @classmethod
     def validate_role(cls, value: str) -> str:
-        allowed_roles = {"requester", "warehouse_manager", "warehouse_operator", "admin", "pending"}
-        if value not in allowed_roles:
-            raise ValueError("Invalid role")
+        if value not in ALL_ROLES:
+            raise ValueError("Некорректная роль")
         return value
 
 
@@ -56,15 +67,14 @@ class UserUpdate(BaseModel):
     @classmethod
     def validate_latin_only(cls, value: str) -> str:
         if not LATIN_NAME_PATTERN.fullmatch(value):
-            raise ValueError("Only latin letters are allowed")
+            raise ValueError("Допустимы только латинские буквы")
         return value
 
     @field_validator("role")
     @classmethod
     def validate_role(cls, value: str) -> str:
-        allowed_roles = {"requester", "warehouse_manager", "warehouse_operator", "admin", "pending"}
-        if value not in allowed_roles:
-            raise ValueError("Invalid role")
+        if value not in ALL_ROLES:
+            raise ValueError("Некорректная роль")
         return value
 
 
@@ -80,6 +90,7 @@ class UserRead(BaseModel):
     last_name: str
     full_name: str
     email: EmailStr
+    avatar_url: str | None = None
     role: str
     is_active: bool
     created_at: datetime

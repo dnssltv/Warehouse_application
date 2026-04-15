@@ -18,18 +18,39 @@ from app.models.work_type import WorkType
 
 app = FastAPI(title="Warehouse App API")
 
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=settings.CORS_ORIGINS,
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
+_cors_params: dict = {
+    "allow_origins": settings.CORS_ORIGINS,
+    "allow_credentials": True,
+    "allow_methods": ["*"],
+    "allow_headers": ["*"],
+}
+if settings.cors_lan_regex:
+    _cors_params["allow_origin_regex"] = settings.cors_lan_regex
+
+app.add_middleware(CORSMiddleware, **_cors_params)
 
 app.include_router(api_router)
 
 os.makedirs("uploads", exist_ok=True)
 app.mount("/uploads", StaticFiles(directory="uploads"), name="uploads")
+
+
+def ensure_schema() -> None:
+    """Лёгкие миграции без Alembic: добавление колонок к существующей БД."""
+    statements = [
+        "ALTER TABLE requests ADD COLUMN IF NOT EXISTS fulfillment_site VARCHAR(40) NOT NULL DEFAULT 'warehouse';",
+        "ALTER TABLE requests ADD COLUMN IF NOT EXISTS pause_comment TEXT;",
+        "ALTER TABLE requests ADD COLUMN IF NOT EXISTS active_duration_seconds INTEGER;",
+        "ALTER TABLE requests ADD COLUMN IF NOT EXISTS total_pause_seconds INTEGER NOT NULL DEFAULT 0;",
+        "ALTER TABLE requests ADD COLUMN IF NOT EXISTS pause_started_at TIMESTAMP;",
+        "ALTER TABLE requests ADD COLUMN IF NOT EXISTS feedback_liked_points JSON;",
+        "ALTER TABLE requests ADD COLUMN IF NOT EXISTS feedback_issue_points JSON;",
+        "ALTER TABLE requests ADD COLUMN IF NOT EXISTS feedback_free_text TEXT;",
+        "ALTER TABLE users ADD COLUMN IF NOT EXISTS avatar_url VARCHAR(500);",
+    ]
+    with engine.begin() as conn:
+        for stmt in statements:
+            conn.execute(text(stmt))
 
 
 def seed_admin():
@@ -77,6 +98,7 @@ def startup_event():
             with engine.connect() as connection:
                 connection.execute(text("SELECT 1"))
             Base.metadata.create_all(bind=engine)
+            ensure_schema()
             seed_admin()
             print("Database is ready. Tables created.")
             return

@@ -77,4 +77,41 @@ class RequestService:
 
     @staticmethod
     def calculate_duration_seconds(started_at: datetime, finished_at: datetime) -> int:
-        return int((finished_at - started_at).total_seconds())
+        if finished_at <= started_at:
+            return 0
+
+        total = 0
+        cursor = started_at
+        while cursor < finished_at:
+            day_start = cursor.replace(
+                hour=WORKDAY_START.hour,
+                minute=WORKDAY_START.minute,
+                second=0,
+                microsecond=0,
+            )
+            day_end = cursor.replace(
+                hour=WORKDAY_END.hour,
+                minute=WORKDAY_END.minute,
+                second=0,
+                microsecond=0,
+            )
+
+            if cursor < day_start:
+                cursor = day_start
+                continue
+
+            if cursor >= day_end:
+                next_day = cursor + timedelta(days=1)
+                cursor = next_day.replace(
+                    hour=WORKDAY_START.hour,
+                    minute=WORKDAY_START.minute,
+                    second=0,
+                    microsecond=0,
+                )
+                continue
+
+            window_end = min(day_end, finished_at)
+            total += int((window_end - cursor).total_seconds())
+            cursor = window_end
+
+        return max(0, total)
